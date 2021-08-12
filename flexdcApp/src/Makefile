@@ -8,17 +8,20 @@ include $(TOP)/configure/CONFIG
 #==================================================
 # build a support library
 
-LIBRARY_IOC += flexdc
+LIBRARY_IOC += flexdcMotor
 
-# xxxRecord.h will be created from xxxRecord.dbd
-#DBDINC += xxxRecord
-# install flexdc.dbd into <top>/dbd
-DBD += flexdc.dbd
+# install flexdcMotor.dbd into <top>/dbd
+DBD += flexdcMotor.dbd
+
+INC += FlexDCMotorDriver.h
 
 # specify all source files to be compiled and added to the library
-#flexdc_SRCS += xxx
+flexdcMotor_SRCS += FlexDCMotorDriver.h
 
-flexdc_LIBS += $(EPICS_BASE_IOC_LIBS)
+flexdcMotor_LIBS += motor
+flexdcMotor_LIBS += asyn
+
+flexdcMotor_LIBS += $(EPICS_BASE_IOC_LIBS)
 
 #===========================
 

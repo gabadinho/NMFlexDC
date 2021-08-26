@@ -1,0 +1,28 @@
+record(motor, "$(P)$(M)")
+{
+	field(RDBD, "$(RDBD)")
+}
+
+record(ao, "$(P)$(M)_RDBD_CMD")
+{
+	field(DESC, "Motor record RDBD")
+	field(OMSL, "closed_loop")
+	field(DTYP, "asynFloat64")
+	field(DOL,  "$(P)$(M).RDBD CP MS")
+	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_RDBD")
+}
+
+record(ao, "$(P)$(M)_HOMR_CMD")
+{
+	field(DESC, "HOMR macro")
+	field(DTYP, "asynOctetWrite")
+	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMR")
+}
+
+record(ao, "$(P)$(M)_HOMF_CMD")
+{
+	field(DESC, "HOMF macro")
+	field(DTYP, "asynOctetWrite")
+	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMF")
+}
+

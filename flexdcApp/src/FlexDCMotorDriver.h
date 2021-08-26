@@ -2,7 +2,7 @@
 FILENAME...   FlexDCMotorDriver.h
 USAGE...      Motor driver support (model 3, asyn) for the Nanomotion FlexDC controller
 
-Jose Gabadinho
+Jose G.C. Gabadinho
 April 2021
 */
 
@@ -16,33 +16,42 @@ April 2021
 
 #define MAX_FLEXDC_STRING_SIZE 80
 
-#define AXIS_RDBD_PARAMNAME "MOTOR_RDBD"
+#define AXIS_RDBD_PARAMNAME      "MOTOR_RDBD"
+#define AXIS_HOMRMACRO_PARAMNAME "MOTOR_HOMR"
+#define AXIS_HOMFMACRO_PARAMNAME "MOTOR_HOMF"
 
+
+
+const char CTRL_AXES[] = { 'X', 'Y' };
 
 
 const char CTRL_RESET_CMD[] = "XRS";
 
 const char CTRL_VER_CMD[] = "XVR";
 
-const char* AXIS_MOVE_CMD[]     = { "XMM=0;XSM=0;XAP=%d;XBG", "YMM=0;YSM=0;YAP=%d;YBG" };
-const char* AXIS_FORCEPOS_CMD[] = { "XPS=%ld", "YPS=%ld" };
+// ENABLE PID & SET SPEED!!!
+const char AXIS_MOVE_CMD[]     = "%cMO=1;%cMM=0;%cSM=0;%cAP=%ld;%cBG";
+const char AXIS_FORCEPOS_CMD[] = "%cPS=%ld";
 
-const char* AXIS_GETPOS_CMD[]   = { "XPS", "YPS" };
-const char* AXIS_POSERR_CMD[]   = { "XPE", "YPE" };
+const char AXIS_GETPOS_CMD[] = "%cPS";
+const char AXIS_POSERR_CMD[] = "%cPE";
 
-const char* AXIS_MOTIONSTAT_CMD[]   = { "XMS", "YMS" };
-const char* AXIS_ENDMOTREAS_CMD[]   = { "XEM", "YEM" };
-const char* AXIS_MOTORFAULT_CMD[]   = { "XMF", "YMF" };
+const char AXIS_MOTIONSTATUS_CMD[] = "%cMS";
+const char AXIS_MOTIONEND_CMD[]    = "%cEM";
+const char AXIS_MOTORFAULT_CMD[]   = "%cMF";
 
-const char* AXIS_STOP_CMD[] = { "XST", "YST" };
+const char AXIS_STOP_CMD[] = "%cST";
 
-const char* AXIS_GETSPEED_CMD[] = { "XSP", "YSP" };
-const char* AXIS_SETSPEED_CMD[] = { "XSP=%d", "YSP=%d" };
+const char AXIS_GETSPEED_CMD[] = "%cSP";
+const char AXIS_SETSPEED_CMD[] = "%cSP=%d";
 
-const char* AXIS_POWER_CMD[]     = { "XMO=%d", "YMO=%d" };
-const char* AXIS_ISPOWERED_CMD[] = { "XMO", "YMO" };
+const char AXIS_POWER_CMD[]     = "%cMO=%d";
+const char AXIS_ISPOWERED_CMD[] = "%cMO";
 
-const char* AXIS_MACRO_RESULT_CMD[] = { "XPA[11]", "YPA[11]" };
+const char AXIS_MACRO_RESULT_CMD[] = "%cPA[11]";
+
+const char AXIS_MACRO_HALT_CMD[] = "%cQH";
+
 
 
 enum flexdcMotionEndReason {
@@ -57,6 +66,18 @@ enum flexdcMotionEndReason {
     MOTOR_OFF,
     BAD_PARAM
 };
+const char* MOTION_END_REASON[] = {
+    "IN_MOTION",
+    "NORMAL",
+    "HARD_FLS",
+    "HARD_RLS",
+    "SOFT_HL",
+    "SOFT_LL",
+    "MOTOR_FAULT",
+    "USER_STOP",
+    "MOTOR_OFF",
+    "BAD_PARAM"
+};
 
 enum flexdcMacroResult {
     EXECUTING,
@@ -65,13 +86,17 @@ enum flexdcMacroResult {
     FAIL_TOO_MANY_FOUND,
     FAIL_GET_OFF_INPUT=9
 };
-
-enum flexdcMotionStatus {
-    IDLE,
-    MOVING,
-    STOPPED,
-    ACCEL,
-    DECEL
+const char* MACRO_RESULT[] = {
+    "EXECUTING",
+    "OK",
+    "OTHER2",
+    "OTHER3",
+    "OTHER4",
+    "FAIL_NO_INDEX_FOUND",
+    "FAIL_TOO_MANY_FOUND",
+    "OTHER7",
+    "OTHER8",
+    "FAIL_GET_OFF_INPUT"
 };
 
 
@@ -94,16 +119,18 @@ public:
     // Specific class methods
     void setStatusProblem(asynStatus status);
 
+    asynStatus switchMotorPower(bool on);
+
 private:
     FlexDCController *pC_; // Pointer to the asynMotorController to which this axis belongs
 
     int motionStatus;
+    int motorFault;
     int endMotionReason;
     int macroResult;
-    int motorFault;
     long positionError;
-    long readbackPosition;
-    bool motorOn;
+    long positionReadback;
+    bool isMotorOn;
 
 friend class FlexDCController;
 };
@@ -123,7 +150,9 @@ public:
 
 protected:
     int driverRetryDeadband;
-#define NUM_FLEXDC_PARAMS 1
+    int driverHomeReverseMacro;
+    int driverHomeForwardMacro;
+#define NUM_FLEXDC_PARAMS 3
 
 private:
 

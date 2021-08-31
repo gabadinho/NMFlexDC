@@ -99,6 +99,21 @@ const char* MACRO_RESULT[] = {
     "FAIL_GET_OFF_INPUT"
 };
 
+enum flexdcHomeMacro {
+    DISABLED,
+    HOME_LS,
+    HOME_IDX
+};
+const char* HOMR_MACRO[] = {
+    "",
+    "HINRI%c",
+    "HINX_%c"
+};
+const char* HOMF_MACRO[] = {
+    "",
+    "HINFI%c",
+    "HINX_%c"
+};
 
 
 class FlexDCAxis: public asynMotorAxis {
@@ -118,8 +133,8 @@ public:
 
     // Specific class methods
     void setStatusProblem(asynStatus status);
-
     asynStatus switchMotorPower(bool on);
+    asynStatus haltHomingMacro();
 
 private:
     FlexDCController *pC_; // Pointer to the asynMotorController to which this axis belongs

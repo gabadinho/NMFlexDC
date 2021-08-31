@@ -12,17 +12,27 @@ record(ao, "$(P)$(M)_RDBD_CMD")
 	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_RDBD")
 }
 
-record(ao, "$(P)$(M)_HOMR_CMD")
+record(mbbo, "$(P)$(M)_HOMR_CMD")
 {
 	field(DESC, "HOMR macro")
-	field(DTYP, "asynOctetWrite")
+    field(DTYP, "asynInt32")
+    field(VAL,  "$(HOMR)")
+    field(ZRST, "Disabled")
+    field(ONST, "HINRI")
+    field(TWST, "HINX_")
+    field(PINI, "YES")
 	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMR")
 }
 
-record(ao, "$(P)$(M)_HOMF_CMD")
+record(mbbo, "$(P)$(M)_HOMF_CMD")
 {
 	field(DESC, "HOMF macro")
-	field(DTYP, "asynOctetWrite")
+    field(DTYP, "asynInt32")
+    field(VAL,  "$(HOMF)")
+    field(ZRST, "Disabled")
+    field(ONST, "HINFI")
+    field(TWST, "HINX_")
+    field(PINI, "YES")
 	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMF")
 }
 

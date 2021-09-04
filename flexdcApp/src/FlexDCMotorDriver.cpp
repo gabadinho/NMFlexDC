@@ -177,7 +177,7 @@ void FlexDCAxis::report(FILE *fp, int level) {
 
         fprintf(fp,
             "  axis %d\n"
-            "  on = %d\n"
+            "  switched on = %d\n"
             "  last speed = %ld\n"
             "  fault = %x\n"
             "  motion end = %s\n"
@@ -211,18 +211,17 @@ asynStatus FlexDCAxis::move(double position, int relative, double minVelocity, d
     if (this->macroResult == EXECUTING) {
         status = haltHomingMacro();
     }
-    if ((status == asynSuccess) && (this->motionStatus!=0)) {
+    if ((status == asynSuccess) && (this->motionStatus != 0)) {
         status = stopMotor();
     }
-
     if (status == asynSuccess) {
         if (relative) {
             target += this->positionReadback;
         }
         setIntegerParam(pC_->motorStatusDone_, 0);
 
-        // SPEED!!!
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Moving FlexDC %s axis %d to %ld\n", pC_->portName, this->axisNo_, target);
+        // SET SPEED!!!
+        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Moving FlexDC %s axis %d to %ld at velocity %f\n", pC_->portName, this->axisNo_, target, maxVelocity);
         sprintf(pC_->outString_, AXIS_MOVE_CMD, mot, mot, mot, mot, target, mot);
         status = pC_->writeController();
     }
@@ -234,16 +233,33 @@ asynStatus FlexDCAxis::move(double position, int relative, double minVelocity, d
 
 asynStatus FlexDCAxis::home(double minVelocity, double maxVelocity, double acceleration, int forwards) {
     asynStatus status = asynSuccess;
-
+    char mot = CTRL_AXES[this->axisNo_];
+    int hom_type;
 
     if (this->macroResult == EXECUTING) {
         status = haltHomingMacro();
     }
-    if ((status == asynSuccess) && (this->motionStatus!=0)) {
+    if ((status == asynSuccess) && (this->motionStatus != 0)) {
         status = stopMotor();
     }
-
     if (status == asynSuccess) {
+        if (forwards) {
+            pC_->getIntegerParam(this->axisNo_, pC_->driverHomeForwardMacro, &hom_type);
+            if (hom_type > DISABLED) {
+                sprintf(pC_->outString_, HOMF_MACRO[hom_type], mot);
+                status = pC_->writeController();
+            } else {
+                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Forward-homing of FlexDC %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
+            }
+        } else {
+            pC_->getIntegerParam(this->axisNo_, pC_->driverHomeReverseMacro, &hom_type);
+            if (hom_type > DISABLED) {
+                sprintf(pC_->outString_, HOMR_MACRO[hom_type], mot);
+                status = pC_->writeController();
+            } else {
+                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Reverse-homing of FlexDC %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
+            }
+        }
     }
 
     setStatusProblem(status);
@@ -266,8 +282,8 @@ asynStatus FlexDCAxis::stop(double acceleration) {
 asynStatus FlexDCAxis::setPosition(double position) {
     asynStatus status = asynError;
 
-    if ((this->macroResult == EXECUTING) || (this->motionStatus!=0)) {
-        // REFUSE TO DO IT!
+    if ((this->macroResult == EXECUTING) || (this->motionStatus != 0)) {
+        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Due to ongoing motion of FlexDC %s axis %d, readback position will not be overriden!\n", pC_->portName, this->axisNo_);
     } else {
         sprintf(pC_->outString_, AXIS_FORCEPOS_CMD, CTRL_AXES[this->axisNo_], (long)position);
         status = pC_->writeController();
@@ -288,7 +304,7 @@ asynStatus FlexDCAxis::setPosition(double position) {
 asynStatus FlexDCAxis::poll(bool *moving) { 
     asynStatus status = asynError, final_status = asynSuccess;
     int at_limit, motion_status;
-    bool valid_motion_status = false;
+    bool valid_motion_status = false, valid_macro_result = false;
     double rdbd, mres;
 
     sprintf(pC_->outString_, AXIS_GETPOS_CMD, CTRL_AXES[this->axisNo_]);
@@ -313,7 +329,7 @@ asynStatus FlexDCAxis::poll(bool *moving) {
     if (status == asynSuccess) {
         motion_status = atoi(pC_->inString_);
         valid_motion_status = true;
-        if ((this->motionStatus!=0) && (motion_status==0)) {
+        if ((this->motionStatus != 0) && (motion_status == 0)) {
             asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "FlexDC %s axis %d has stopped\n", pC_->portName, this->axisNo_);
             setIntegerParam(pC_->motorStatusDone_, 1);
         }
@@ -323,12 +339,22 @@ asynStatus FlexDCAxis::poll(bool *moving) {
         final_status = asynError;
     }
 
+    sprintf(pC_->outString_, AXIS_MACRO_RESULT_CMD, CTRL_AXES[this->axisNo_]);
+    status = pC_->writeReadController();
+    if (status == asynSuccess) {
+        this->macroResult = atoi(pC_->inString_);
+        valid_macro_result = true;
+        setIntegerParam(pC_->driverHomeStatus, this->macroResult);
+    } else {
+        final_status = asynError;
+    }
+
     sprintf(pC_->outString_, AXIS_POSERR_CMD, CTRL_AXES[this->axisNo_]);
     status = pC_->writeReadController();
     if (status == asynSuccess) {
         this->positionError = atol(pC_->inString_);
 
-        if ((valid_motion_status) && (motion_status==0)) {
+        if ((valid_macro_result) && (this->macroResult != 0) && (valid_motion_status) && (motion_status == 0)) {
             pC_->getDoubleParam(this->axisNo_, pC_->driverRetryDeadband, &rdbd);
             pC_->getDoubleParam(this->axisNo_, pC_->motorResolution_, &mres);
             rdbd = rdbd/mres;
@@ -350,18 +376,18 @@ asynStatus FlexDCAxis::poll(bool *moving) {
         this->endMotionReason = atoi(pC_->inString_);
 
         pC_->getIntegerParam(this->axisNo_, pC_->motorStatusLowLimit_, &at_limit);
-        if ( (this->endMotionReason==HARD_RLS) && (!at_limit)) {
+        if ( (this->endMotionReason == HARD_RLS) && (!at_limit)) {
             setIntegerParam(pC_->motorStatusLowLimit_, 1);
             switchMotorPower(0);
-        } else if ( (this->endMotionReason!=HARD_RLS) && (at_limit)) {
+        } else if ( (this->endMotionReason != HARD_RLS) && (at_limit)) {
             setIntegerParam(pC_->motorStatusLowLimit_, 0);
         }
 
         pC_->getIntegerParam(this->axisNo_, pC_->motorStatusHighLimit_, &at_limit);
-        if ( (this->endMotionReason==HARD_FLS) && (!at_limit)) {
+        if ( (this->endMotionReason == HARD_FLS) && (!at_limit)) {
             setIntegerParam(pC_->motorStatusHighLimit_, 1);
             switchMotorPower(0);
-        } else if ( (this->endMotionReason!=HARD_FLS) && (at_limit)) {
+        } else if ( (this->endMotionReason != HARD_FLS) && (at_limit)) {
             setIntegerParam(pC_->motorStatusHighLimit_, 0);
         }
 
@@ -373,15 +399,6 @@ asynStatus FlexDCAxis::poll(bool *moving) {
     status = pC_->writeReadController();
     if (status == asynSuccess) {
         this->motorFault = atoi(pC_->inString_);
-    } else {
-        final_status = asynError;
-    }
-
-    sprintf(pC_->outString_, AXIS_MACRO_RESULT_CMD, CTRL_AXES[this->axisNo_]);
-    status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        this->macroResult = atoi(pC_->inString_);
-        setIntegerParam(pC_->driverHomeStatus, this->macroResult);
     } else {
         final_status = asynError;
     }

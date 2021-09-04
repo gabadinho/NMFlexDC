@@ -19,6 +19,7 @@ April 2021
 #define AXIS_RDBD_PARAMNAME      "MOTOR_RDBD"
 #define AXIS_HOMRMACRO_PARAMNAME "MOTOR_HOMR"
 #define AXIS_HOMFMACRO_PARAMNAME "MOTOR_HOMF"
+#define AXIS_HOMS_PARAMNAME      "MOTOR_HOMS"
 
 
 
@@ -134,6 +135,7 @@ public:
     // Specific class methods
     void setStatusProblem(asynStatus status);
     asynStatus switchMotorPower(bool on);
+    asynStatus stopMotor();
     asynStatus haltHomingMacro();
 
 private:
@@ -167,7 +169,8 @@ protected:
     int driverRetryDeadband;
     int driverHomeReverseMacro;
     int driverHomeForwardMacro;
-#define NUM_FLEXDC_PARAMS 3
+    int driverHomeStatus;
+#define NUM_FLEXDC_PARAMS 4
 
 private:
 

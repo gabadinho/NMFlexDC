@@ -36,3 +36,23 @@ record(mbbo, "$(P)$(M)_HOMF_CMD")
 	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMF")
 }
 
+record(mbbi, "$(P)$(M)_HOMS_CMD")
+{
+	field(DESC, "HOMR/F status")
+    field(DTYP, "asynInt32")
+    field(ZRST, "EXECUTING")
+    field(ONST, "OK")
+    field(TWST, "OTHER2")
+    field(THST, "OTHER3")
+    field(FRST, "OTHER4")
+    field(FVST, "FAIL_NO_INDEX")
+    field(SXST, "FAIL_MANY_IDXS")
+    field(SVST, "OTHER7")
+    field(EIST, "OTHER8")
+    field(NIST, "FAIL_GET_OFF")
+    field(VAL,  "1")
+	field(INP,  "@asyn($(PORT),$(ADDR))MOTOR_HOMS")
+    field(SCAN, "I/O Intr")
+
+}
+

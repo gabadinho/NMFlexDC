@@ -30,8 +30,7 @@ const char CTRL_RESET_CMD[] = "XRS";
 
 const char CTRL_VER_CMD[] = "XVR";
 
-// ENABLE PID & SET SPEED!!!
-const char AXIS_MOVE_CMD[]     = "%cMO=1;%cMM=0;%cSM=0;%cAP=%ld;%cBG";
+const char AXIS_MOVE_CMD[]     = "%cMO=1;%cMM=0;%cSM=0;%cSP=%d;%cAP=%ld;%cBG";
 const char AXIS_FORCEPOS_CMD[] = "%cPS=%ld";
 
 const char AXIS_GETPOS_CMD[] = "%cPS";

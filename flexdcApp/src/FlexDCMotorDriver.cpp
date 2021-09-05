@@ -37,8 +37,8 @@ static const char *driverName = "NanomotionFlexDC";
   */
 FlexDCController::FlexDCController(const char *portName, const char *asynPortName, int numAxes, double movingPollPeriod, double idlePollPeriod)
     :asynMotorController(portName, 2, NUM_FLEXDC_PARAMS, 
-                         asynOctetMask, // || asynFloat64Mask,
-                         asynOctetMask, // || asynFloat64Mask,
+                         0,
+                         0,
                          ASYN_CANBLOCK | ASYN_MULTIDEVICE, 
                          1, /* autoconnect */
                          0, 0) /* Default priority and stack size */ {
@@ -82,13 +82,11 @@ FlexDCController::FlexDCController(const char *portName, const char *asynPortNam
     startPoller(movingPollPeriod, idlePollPeriod, 2);
 }
 
-/** Reports on status of the driver
+/** Reports on status of the driver.
+  * If level > 0 then error message, controller version is printed.
   *
   * \param[in] fp The file pointer on which report information will be written
   * \param[in] level The level of report detail desired
-  *
-  * If details > 0 then information is printed about each axis.
-  * After printing controller-specific information calls asynMotorController::report()
   */
 void FlexDCController::report(FILE *fp, int level) {
     asynStatus status = asynError;
@@ -153,12 +151,11 @@ FlexDCAxis::FlexDCAxis(FlexDCController *pC, int axisNo): asynMotorAxis(pC, axis
     callParamCallbacks();
 }
 
-/** Reports on status of the driver
+/** Reports on status of the axis.
+  * If level > 0 then detailed axis information (on, speed, fault, end-motion reason, etc.) is printed.
+  *
   * \param[in] fp The file pointer on which report information will be written
   * \param[in] level The level of report detail desired
-  *
-  * If details > 0 then information is printed about each axis.
-  * After printing controller-specific information calls asynMotorAxis::report()
   */
 void FlexDCAxis::report(FILE *fp, int level) {
     long speed;
@@ -203,10 +200,22 @@ void FlexDCAxis::report(FILE *fp, int level) {
     asynMotorAxis::report(fp, level);
 }
 
+/** Moves the axis to a different target position.
+  * Warning: stops any ongoing move or home actions!
+  *
+  * \param[in] position      The desired target position
+  * \param[in] relative      1 for relative position
+  * \param[in] minVelocity   Motion parameter
+  * \param[in] maxVelocity   Motion parameter
+  * \param[in] acceleration  Motion parameter
+  *
+  * \return Result of callParamCallbacks() call
+  */
 asynStatus FlexDCAxis::move(double position, int relative, double minVelocity, double maxVelocity, double acceleration) {
     asynStatus status = asynSuccess;
     long target = (long)position;
     char mot = CTRL_AXES[this->axisNo_];
+    int speed;
 
     if (this->macroResult == EXECUTING) {
         status = haltHomingMacro();
@@ -220,9 +229,9 @@ asynStatus FlexDCAxis::move(double position, int relative, double minVelocity, d
         }
         setIntegerParam(pC_->motorStatusDone_, 0);
 
-        // SET SPEED!!!
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Moving FlexDC %s axis %d to %ld at velocity %f\n", pC_->portName, this->axisNo_, target, maxVelocity);
-        sprintf(pC_->outString_, AXIS_MOVE_CMD, mot, mot, mot, mot, target, mot);
+        speed=100000; // CALCULATE PROPER SPEED HERE!!!
+        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Moving FlexDC %s axis %d to %ld at velocity %d\n", pC_->portName, this->axisNo_, target, speed);
+        sprintf(pC_->outString_, AXIS_MOVE_CMD, mot, mot, mot, mot, speed, mot, target, mot);
         status = pC_->writeController();
     }
 
@@ -231,6 +240,16 @@ asynStatus FlexDCAxis::move(double position, int relative, double minVelocity, d
     return callParamCallbacks();
 }
 
+/** Starts the axis homing macro, as defined in the HOMR_CMD or HOMF_CMD records.
+  * Warning: stops any ongoing move or home actions!
+  *
+  * \param[in] minVelocity   Motion parameter
+  * \param[in] maxVelocity   Motion parameter
+  * \param[in] acceleration  Motion parameter
+  * \param[in] forwards      1 if user wants to home forward, 0 for reverse
+  *
+  * \return Result of callParamCallbacks() call
+  */
 asynStatus FlexDCAxis::home(double minVelocity, double maxVelocity, double acceleration, int forwards) {
     asynStatus status = asynSuccess;
     char mot = CTRL_AXES[this->axisNo_];
@@ -267,6 +286,12 @@ asynStatus FlexDCAxis::home(double minVelocity, double maxVelocity, double accel
     return callParamCallbacks();
 }
 
+/** Stops an ongoing motion.
+  *
+  * \param[in] acceleration  Motion parameter
+  *
+  * \return Result of callParamCallbacks() call
+  */
 asynStatus FlexDCAxis::stop(double acceleration) {
     asynStatus status = asynError;
 
@@ -279,6 +304,13 @@ asynStatus FlexDCAxis::stop(double acceleration) {
     return callParamCallbacks();
 }
 
+/** Forces the axis readback position to some value.
+  * Warning: if motor is movinr or homing, nothing is done!
+  *
+  * \param[in] position  The desired readback position
+  *
+  * \return Result of callParamCallbacks() call
+  */
 asynStatus FlexDCAxis::setPosition(double position) {
     asynStatus status = asynError;
 
@@ -295,12 +327,13 @@ asynStatus FlexDCAxis::setPosition(double position) {
 }
 
 /** Polls the axis.
-  * This function reads the controller position, encoder position, the limit status, the moving status, 
-  * and the drive power-on status.  It does not current detect following error, etc. but this could be
-  * added.
-  * It calls setIntegerParam() and setDoubleParam() for each item that it polls,
-  * and then calls callParamCallbacks() at the end.
-  * \param[out] moving A flag that is set indicating that the axis is moving (1) or done (0). */
+  * Reads the states, limits, readback, etc. and calls setIntegerParam() or setDoubleParam() for each item that it polls.
+  * If motor is stopped and the position error is less than RDBD field, then motor is switched off.
+  *
+  * \param[out] moving A flag that is set indicating that the axis is moving (1) or done (0).
+  *
+  * \return Result of callParamCallbacks() call
+  */
 asynStatus FlexDCAxis::poll(bool *moving) { 
     asynStatus status = asynError, final_status = asynSuccess;
     int at_limit, motion_status;
@@ -424,10 +457,11 @@ void FlexDCAxis::setStatusProblem(asynStatus status) {
     }
 }
 
-
 /** Switches the motor power on or off.
   *
   * \param[in] on 1 to switch motor on, 0 to switch motor off
+  *
+  * \return Result of writeController() call
   */
 asynStatus FlexDCAxis::switchMotorPower(bool on) {
     asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Switching FlexDC %s axis %d power to %d\n", pC_->portName, this->axisNo_, on);
@@ -435,13 +469,20 @@ asynStatus FlexDCAxis::switchMotorPower(bool on) {
     return pC_->writeController();
 }
 
+/** Stops a motion.
+  *
+  * \return Result of writeController() call
+  */
 asynStatus FlexDCAxis::stopMotor() {
     asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Stop motion on FlexDC %s axis %d\n", pC_->portName, this->axisNo_);
     sprintf(pC_->outString_, AXIS_STOP_CMD, CTRL_AXES[this->axisNo_]);
     return pC_->writeController();
 }
 
-
+/** Stops a homing macro.
+  *
+  * \return Result of writeController() call
+  */
 asynStatus FlexDCAxis::haltHomingMacro() {
     asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Halting FlexDC %s axis %d homing macro\n", pC_->portName, this->axisNo_);
     sprintf(pC_->outString_, AXIS_MACRO_HALT_CMD, CTRL_AXES[this->axisNo_]);

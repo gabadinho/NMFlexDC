@@ -16,9 +16,6 @@ April 2021
 
 #include <asynOctetSyncIO.h>
 
-#include <asynMotorController.h>
-#include <asynMotorAxis.h>
-
 #include "FlexDCMotorDriver.h"
 
 #include <epicsExport.h>

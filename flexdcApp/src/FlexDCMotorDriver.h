@@ -9,12 +9,10 @@ April 2021
 #ifndef _FLEXDCMOTORDRIVER_H_
 #define _FLEXDCMOTORDRIVER_H_
 
-#include "asynMotorController.h"
-#include "asynMotorAxis.h"
+#include <asynMotorController.h>
+#include <asynMotorAxis.h>
 
 
-
-#define MAX_FLEXDC_STRING_SIZE 80
 
 #define AXIS_RDBD_PARAMNAME      "MOTOR_RDBD"
 #define AXIS_HOMRMACRO_PARAMNAME "MOTOR_HOMR"

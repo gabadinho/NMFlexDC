@@ -1,58 +1,83 @@
 record(motor, "$(P)$(M)")
 {
-	field(RDBD, "$(RDBD)")
+    field(RDBD, "$(RDBD)")
+    field(RTRY, "0")
+}
+
+record(ao, "$(P)$(M)_MRES_CMD")
+{
+    field(DESC, "Motor record MRES")
+    field(OMSL, "closed_loop")
+    field(DTYP, "asynFloat64")
+    field(DOL,  "$(P)$(M).MRES CP MS")
+    field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_MRES")
 }
 
 record(ao, "$(P)$(M)_RDBD_CMD")
 {
-	field(DESC, "Motor record RDBD")
-	field(OMSL, "closed_loop")
-	field(DTYP, "asynFloat64")
-	field(DOL,  "$(P)$(M).RDBD CP MS")
-	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_RDBD")
+    field(DESC, "Motor record RDBD")
+    field(OMSL, "closed_loop")
+    field(DTYP, "asynFloat64")
+    field(DOL,  "$(P)$(M).RDBD CP MS")
+    field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_RDBD")
 }
 
 record(mbbo, "$(P)$(M)_HOMR_CMD")
 {
-	field(DESC, "HOMR macro")
+    field(DESC, "HOMR macro")
     field(DTYP, "asynInt32")
     field(VAL,  "$(HOMR)")
     field(ZRST, "Disabled")
+    field(ZRVL, "0")
     field(ONST, "HINRI")
+    field(ONVL, "1")
     field(TWST, "HINX_")
+    field(TWVL, "2")
     field(PINI, "YES")
-	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMR")
+    field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMR")
 }
 
 record(mbbo, "$(P)$(M)_HOMF_CMD")
 {
-	field(DESC, "HOMF macro")
+    field(DESC, "HOMF macro")
     field(DTYP, "asynInt32")
     field(VAL,  "$(HOMF)")
     field(ZRST, "Disabled")
+    field(ZRVL, "0")
     field(ONST, "HINFI")
+    field(ONVL, "1")
     field(TWST, "HINX_")
+    field(TWVL, "2")
     field(PINI, "YES")
-	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMF")
+    field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMF")
 }
 
 record(mbbi, "$(P)$(M)_HOMS_CMD")
 {
-	field(DESC, "HOMR/F status")
+    field(DESC, "HOMR/F status")
     field(DTYP, "asynInt32")
     field(ZRST, "EXECUTING")
+    field(ZRVL, "0")
     field(ONST, "OK")
+    field(ONVL, "1")
     field(TWST, "OTHER2")
+    field(TWVL, "2")
     field(THST, "OTHER3")
+    field(THVL, "3")
     field(FRST, "OTHER4")
+    field(FRVL, "4")
     field(FVST, "FAIL_NO_INDEX")
+    field(FVVL, "5")
     field(SXST, "FAIL_MANY_IDXS")
+    field(SXVL, "6")
     field(SVST, "OTHER7")
+    field(SVVL, "7")
     field(EIST, "OTHER8")
+    field(EIVL, "8")
     field(NIST, "FAIL_GET_OFF")
-    field(VAL,  "1")
-	field(INP,  "@asyn($(PORT),$(ADDR))MOTOR_HOMS")
+    field(NIVL, "9")
+    field(VAL,  "2") # Default to a non-standard value until reply from controller
+    field(INP,  "@asyn($(PORT),$(ADDR))MOTOR_HOMS")
     field(SCAN, "I/O Intr")
-
 }
 

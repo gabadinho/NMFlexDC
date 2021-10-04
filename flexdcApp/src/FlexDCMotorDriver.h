@@ -14,10 +14,11 @@ April 2021
 
 
 
-#define AXIS_RDBD_PARAMNAME      "MOTOR_RDBD"
-#define AXIS_HOMRMACRO_PARAMNAME "MOTOR_HOMR"
-#define AXIS_HOMFMACRO_PARAMNAME "MOTOR_HOMF"
-#define AXIS_HOMS_PARAMNAME      "MOTOR_HOMS"
+#define AXIS_MRES_PARAMNAME "MOTOR_MRES"
+#define AXIS_RDBD_PARAMNAME "MOTOR_RDBD"
+#define AXIS_HOMR_PARAMNAME "MOTOR_HOMR"
+#define AXIS_HOMF_PARAMNAME "MOTOR_HOMF"
+#define AXIS_HOMS_PARAMNAME "MOTOR_HOMS"
 
 
 
@@ -28,7 +29,8 @@ const char CTRL_RESET_CMD[] = "XRS";
 
 const char CTRL_VER_CMD[] = "XVR";
 
-const char AXIS_MOVE_CMD[]     = "%cMO=1;%cMM=0;%cSM=0;%cSP=%d;%cAP=%ld;%cBG";
+const char AXIS_MOVEABS_CMD[] = "%cMO=1;%cMM=0;%cSM=0;%cSP=%d;%cAP=%ld;%cBG";
+const char AXIS_MOVEREL_CMD[] = "%cMO=1;%cMM=0;%cSM=0;%cSP=%d;%cRP=%ld;%cBG";
 const char AXIS_FORCEPOS_CMD[] = "%cPS=%ld";
 
 const char AXIS_GETPOS_CMD[] = "%cPS";
@@ -104,14 +106,15 @@ enum flexdcHomeMacro {
 };
 const char* HOMR_MACRO[] = {
     "",
-    "HINRI%c",
-    "HINX_%c"
+    "%cQE,#HINRI%c",
+    "%cQE,#HINX_%c"
 };
 const char* HOMF_MACRO[] = {
     "",
-    "HINFI%c",
-    "HINX_%c"
+    "%cQE,#HINFI%c",
+    "%cQE,#HINX_%c"
 };
+
 
 
 class FlexDCAxis: public asynMotorAxis {
@@ -131,17 +134,29 @@ public:
 
     // Specific class methods
     void setStatusProblem(asynStatus status);
+
+    asynStatus setMotionDone(int motion_status, flexdcMacroResult macro_result, bool power_on, long pos_error);
+
     asynStatus switchMotorPower(bool on);
     asynStatus stopMotor();
     asynStatus haltHomingMacro();
+    void shortWait();
+
+    static bool buildMoveCommand(char *buffer, int axis, double position, bool relative, double velocity);
+    static bool buildSetPositionCommand(char *buffer, int axis, double position);
+    static bool buildStopCommand(char *buffer, int axis);
+    static bool buildHaltMacroCommand(char *buffer, int axis);
+    static bool buildMotorPowerCommand(char *buffer, int axis, bool on);
+    static bool buildHomeMacroCommand(char *buffer, int axis, bool forwards, flexdcHomeMacro home_type);
+    static bool buildGenericGetCommand(char *buffer, const char *command_format, int axis);
 
 private:
     FlexDCController *pC_; // Pointer to the asynMotorController to which this axis belongs
 
     int motionStatus;
     int motorFault;
-    int endMotionReason;
-    int macroResult;
+    flexdcMotionEndReason endMotionReason;
+    flexdcMacroResult macroResult;
     long positionError;
     long positionReadback;
     bool isMotorOn;
@@ -163,11 +178,12 @@ public:
     FlexDCAxis* getAxis(int axisNo);
 
 protected:
+    int driverMotorRecResolution;
     int driverRetryDeadband;
     int driverHomeReverseMacro;
     int driverHomeForwardMacro;
     int driverHomeStatus;
-#define NUM_FLEXDC_PARAMS 4
+#define NUM_FLEXDC_PARAMS 5
 
 private:
 

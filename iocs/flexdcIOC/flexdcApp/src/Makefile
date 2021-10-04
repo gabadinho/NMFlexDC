@@ -16,10 +16,23 @@ DBD += flexdc.dbd
 flexdc_DBD += base.dbd
 
 # Include dbd files from all support applications:
-#flexdc_DBD += xxx.dbd
+#ifdef ASYN
+flexdc_DBD += asyn.dbd
+flexdc_DBD += drvAsynSerialPort.dbd
+flexdc_DBD += drvAsynIPPort.dbd
+#endif
+flexdc_DBD += motorSupport.dbd
+flexdc_DBD += flexdcMotor.dbd
 
 # Add all the support libraries needed by this IOC
-#flexdc_LIBS += xxx
+flexdc_LIBS += flexdcMotor
+flexdc_LIBS += motor
+#ifdef ASYN
+flexdc_LIBS += asyn
+#endif
+#ifdef SNCSEQ
+flexdc_LIBS += seq pv
+#endif
 
 # flexdc_registerRecordDeviceDriver.cpp derives from flexdc.dbd
 flexdc_SRCS += flexdc_registerRecordDeviceDriver.cpp

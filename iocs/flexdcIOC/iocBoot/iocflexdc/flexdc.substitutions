@@ -1,0 +1,16 @@
+file "$(MOTOR)/db/basic_asyn_motor.db"
+{
+pattern
+{P,        M,        DTYP,         PORT,      ADDR,  DESC,           EGU,  DIR,  VELO,  VBAS,  ACCL,  BDST,  BVEL,  BACC,  MRES,     PREC,  DHLM,  DLLM,   INIT  }
+{FLEXDC:,  "MOT0",   "asynMotor",  NMFLEXDC,  0,     "FlexDC Mot0",  mm,   Pos,  5,     0,     0,     0,     1,     .2,    0.00005,  5,     20,    -20,     ""    }
+{FLEXDC:,  "MOT1",   "asynMotor",  NMFLEXDC,  1,     "FlexDC Mot1",  mm,   Neg,  5,     0,     0,     0,     1,     .2,    0.00005,  5,     20,    -20,     ""    }
+}
+
+file "$(MOTOR_NMFLEXDC)/db/flexdc_motor_extra.template"
+{
+pattern
+{P,        M,       PORT,      ADDR,   RDBD,     HOMR,    HOMF}
+{FLEXDC:,  "MOT0",  NMFLEXDC,  0,      0.001     1,       2   }
+{FLEXDC:,  "MOT1",  NMFLEXDC,  1,      0.001,    1,       0   }
+}
+

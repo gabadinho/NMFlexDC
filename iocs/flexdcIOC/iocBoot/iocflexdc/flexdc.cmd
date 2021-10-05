@@ -4,7 +4,7 @@
 dbLoadTemplate("flexdc.substitutions")
 
 # Configure asyn IP address
-drvAsynIPPortConfigure("NMCTRL", "192.1168.100.1:4000")
+drvAsynIPPortConfigure("NMCTRL", "192.168.100.1:4000")
 
 # Load asyn record
 dbLoadRecords("$(ASYN)/db/asynRecord.db", "P=FLEXDC:, R=ASYN1, PORT=NMCTRL, ADDR=0, OMAX=256, IMAX=256")

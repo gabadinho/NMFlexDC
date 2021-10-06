@@ -51,6 +51,7 @@ FlexDCController::FlexDCController(const char *portName, const char *asynPortNam
     createParam(AXIS_HOMR_PARAMNAME, asynParamInt32, &driverHomeReverseMacro);
     createParam(AXIS_HOMF_PARAMNAME, asynParamInt32, &driverHomeForwardMacro);
     createParam(AXIS_HOMS_PARAMNAME, asynParamInt32, &driverHomeStatus);
+    createParam(CTRL_RST_PARAMNAME,  asynParamInt32, &driverResetController);
 
     numAxes = 2; // Force two-axes regardless of what user says
 
@@ -81,10 +82,50 @@ FlexDCController::FlexDCController(const char *portName, const char *asynPortNam
     startPoller(movingPollPeriod, idlePollPeriod, 2);
 }
 
+/** Called when asyn clients call pasynInt32->write().
+  * Extracts the function and axis number from pasynUser.
+  * Sets the value in the parameter library.
+  * If the function is motorStop_ then it calls pAxis->stop().
+  * If the function is motorUpdateStatus_ then it does a poll and forces a callback.
+  * Calls any registered callbacks for this pasynUser->reason and address.  
+  * Motor drivers will reimplement this function if they support 
+  * controller-specific parameters on the asynInt32 interface. They should call this
+  * base class method for any parameters that are not controller-specific.
+  *
+  * \param[in] pasynUser asynUser structure that encodes the reason and address.
+  * \param[in] value     Value to write.
+  */
+asynStatus FlexDCController::writeInt32(asynUser *pasynUser, epicsInt32 value) {
+    int function = pasynUser->reason;
+    asynMotorAxis *p_axis;
+    asynStatus status = asynSuccess;
+    const char* functionName = "writeInt32";
+
+    p_axis = getAxis(pasynUser);
+    if (p_axis) {
+        if (function == driverResetController) {
+            p_axis->setIntegerParam(function, value);
+
+            sprintf(this->outString_, CTRL_RESET_CMD);
+            status = this->writeReadController();
+
+            p_axis->callParamCallbacks();
+        } else {
+            status = asynMotorController::writeInt32(pasynUser, value);
+        }
+    } else {
+        asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Unable to retrieve FlexDC %s axis from asynUser in %s\n", this->portName, functionName);
+        status = asynError;
+    }
+
+    return status;
+}
+
+
 /** Reports on status of the driver.
   * If level > 0 then error message, controller version is printed.
   *
-  * \param[in] fp The file pointer on which report information will be written
+  * \param[in] fp    The file pointer on which report information will be written
   * \param[in] level The level of report detail desired
   */
 void FlexDCController::report(FILE *fp, int level) {
@@ -139,8 +180,8 @@ FlexDCAxis* FlexDCController::getAxis(int axisNo) {
 FlexDCAxis::FlexDCAxis(FlexDCController *pC, int axisNo): asynMotorAxis(pC, axisNo), pC_(pC) {
     this->motionStatus = 0;
     this->motorFault = 0;
-    this->endMotionReason = IN_MOTION;
-    this->macroResult = EXECUTING;
+    this->endMotionReason = MOTOR_OFF;
+    this->macroResult = FAIL_NO_INDEX_FOUND;
     this->positionError = 0;
     this->positionReadback = 0;
     this->isMotorOn = false;
@@ -499,7 +540,7 @@ asynStatus FlexDCAxis::setMotionDone(int motion_status, flexdcMacroResult macro_
 
     pC_->getIntegerParam(this->axisNo_, pC_->motorStatusDone_, &status_done);
     if (!status_done) {
-        if ((macro_result == OK) && (motion_status == 0) && (power_on)) {
+        if ((macro_result != EXECUTING) && (motion_status == 0) && (power_on)) {
             pC_->getDoubleParam(this->axisNo_, pC_->driverRetryDeadband, &rdbd);
             pC_->getDoubleParam(this->axisNo_, pC_->driverMotorRecResolution, &mres);
             allowed_error = (int)(rdbd/mres);
@@ -509,6 +550,8 @@ asynStatus FlexDCAxis::setMotionDone(int motion_status, flexdcMacroResult macro_
                 setIntegerParam(pC_->motorStatusDone_, 1);
                 status = switchMotorPower(false);
             }
+        } else if ((macro_result != EXECUTING) && (motion_status == 0)) {
+            setIntegerParam(pC_->motorStatusDone_, 1);
         }
     }
 
@@ -590,7 +633,8 @@ bool FlexDCAxis::buildHaltMacroCommand(char *buffer, int axis) {
     if ((!buffer) || (axis<0) || (axis>1)) {
         return false;
     }
-    sprintf(buffer, AXIS_MACRO_HALT_CMD, CTRL_AXES[axis]);
+    //sprintf(buffer, AXIS_MACRO_HALT_CMD, CTRL_AXES[axis]);
+    sprintf(buffer, AXIS_MACRO_KILLINIT_CMD, CTRL_AXES[axis], CTRL_AXES[axis]);
     return true;
 }
 

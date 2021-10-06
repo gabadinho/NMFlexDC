@@ -19,18 +19,18 @@ April 2021
 #define AXIS_HOMR_PARAMNAME "MOTOR_HOMR"
 #define AXIS_HOMF_PARAMNAME "MOTOR_HOMF"
 #define AXIS_HOMS_PARAMNAME "MOTOR_HOMS"
+#define CTRL_RST_PARAMNAME  "CTRL_RESET"
 
 
 
 const char CTRL_AXES[] = { 'X', 'Y' };
 
-
-const char CTRL_RESET_CMD[] = "XRS";
-
 const char CTRL_VER_CMD[] = "XVR";
 
-const char AXIS_MOVEABS_CMD[] = "%cMO=1;%cMM=0;%cSM=0;%cSP=%d;%cAP=%ld;%cBG";
-const char AXIS_MOVEREL_CMD[] = "%cMO=1;%cMM=0;%cSM=0;%cSP=%d;%cRP=%ld;%cBG";
+const char CTRL_RESET_CMD[] = "XQK;YQK;AMO=0;XRS";
+
+const char AXIS_MOVEABS_CMD[]  = "%cMO=1;%cMM=0;%cSM=0;%cSP=%d;%cAP=%ld;%cBG";
+const char AXIS_MOVEREL_CMD[]  = "%cMO=1;%cMM=0;%cSM=0;%cSP=%d;%cRP=%ld;%cBG";
 const char AXIS_FORCEPOS_CMD[] = "%cPS=%ld";
 
 const char AXIS_GETPOS_CMD[] = "%cPS";
@@ -50,7 +50,8 @@ const char AXIS_ISPOWERED_CMD[] = "%cMO";
 
 const char AXIS_MACRO_RESULT_CMD[] = "%cPA[11]";
 
-const char AXIS_MACRO_HALT_CMD[] = "%cQH";
+const char AXIS_MACRO_HALT_CMD[]     = "%cQH";
+const char AXIS_MACRO_KILLINIT_CMD[] = "%cQK;%cQI";
 
 
 
@@ -172,6 +173,8 @@ public:
     FlexDCController(const char *portName, const char *asynPortName, int numAxes, double movingPollPeriod, double idlePollPeriod);
 
     // These are the methods we override from the base class
+    asynStatus writeInt32(asynUser *pasynUser, epicsInt32 value);
+
     void report(FILE *fp, int level);
 
     FlexDCAxis* getAxis(asynUser *pasynUser);
@@ -183,7 +186,8 @@ protected:
     int driverHomeReverseMacro;
     int driverHomeForwardMacro;
     int driverHomeStatus;
-#define NUM_FLEXDC_PARAMS 5
+    int driverResetController;
+#define NUM_FLEXDC_PARAMS 6
 
 private:
 

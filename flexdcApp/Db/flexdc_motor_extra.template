@@ -81,3 +81,12 @@ record(mbbi, "$(P)$(M)_HOMS_CMD")
     field(SCAN, "I/O Intr")
 }
 
+record(bo, "$(P)$(M)_RST_CMD")
+{
+    field(DESC, "Reset controller")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR))CTRL_RESET")
+    field(ZNAM, "RESET")
+    field(ONAM, "RESET")
+}
+

@@ -187,6 +187,8 @@ FlexDCAxis::FlexDCAxis(FlexDCController *pC, int axisNo): asynMotorAxis(pC, axis
     this->isMotorOn = false;
 
     this->setIntegerParam(pC_->motorStatusHomed_, 0);
+    this->setIntegerParam(pC_->motorStatusHasEncoder_, 1);
+    this->setIntegerParam(pC_->motorClosedLoop_, 1);
     setStatusProblem(asynSuccess);
 
     callParamCallbacks();
@@ -407,6 +409,7 @@ asynStatus FlexDCAxis::poll(bool *moving) {
     status = pC_->writeReadController();
     if (status == asynSuccess) {
         this->positionReadback = atol(pC_->inString_);
+        setDoubleParam(pC_->motorEncoderPosition_, this->positionReadback);
         setDoubleParam(pC_->motorPosition_, this->positionReadback);
     } else {
         final_status = asynError;
@@ -417,6 +420,7 @@ asynStatus FlexDCAxis::poll(bool *moving) {
     if (status == asynSuccess) {
         this->isMotorOn = atol(pC_->inString_);
         valid_ispowered = true;
+        setIntegerParam(pC_->motorStatusPowerOn_, this->isMotorOn);
     } else {
         final_status = asynError;
     }

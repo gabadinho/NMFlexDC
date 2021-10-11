@@ -133,6 +133,16 @@ public:
 
     asynStatus poll(bool *moving);
 
+    // Class-wide methods
+    static bool buildMoveCommand(char *buffer, int axis, double position, bool relative, double velocity);
+    static bool buildSetPositionCommand(char *buffer, int axis, double position);
+    static bool buildStopCommand(char *buffer, int axis);
+    static bool buildHaltMacroCommand(char *buffer, int axis);
+    static bool buildMotorPowerCommand(char *buffer, int axis, bool on);
+    static bool buildHomeMacroCommand(char *buffer, int axis, bool forwards, flexdcHomeMacro home_type);
+    static bool buildGenericGetCommand(char *buffer, const char *command_format, int axis);
+
+protected:
     // Specific class methods
     void setStatusProblem(asynStatus status);
 
@@ -142,14 +152,6 @@ public:
     asynStatus stopMotor();
     asynStatus haltHomingMacro();
     void shortWait();
-
-    static bool buildMoveCommand(char *buffer, int axis, double position, bool relative, double velocity);
-    static bool buildSetPositionCommand(char *buffer, int axis, double position);
-    static bool buildStopCommand(char *buffer, int axis);
-    static bool buildHaltMacroCommand(char *buffer, int axis);
-    static bool buildMotorPowerCommand(char *buffer, int axis, bool on);
-    static bool buildHomeMacroCommand(char *buffer, int axis, bool forwards, flexdcHomeMacro home_type);
-    static bool buildGenericGetCommand(char *buffer, const char *command_format, int axis);
 
 private:
     FlexDCController *pC_; // Pointer to the asynMotorController to which this axis belongs

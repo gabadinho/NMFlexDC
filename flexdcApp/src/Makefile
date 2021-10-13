@@ -16,7 +16,7 @@ DBD += flexdcMotor.dbd
 INC += FlexDCMotorDriver.h
 
 # specify all source files to be compiled and added to the library
-flexdcMotor_SRCS += FlexDCMotorDriver.h
+flexdcMotor_SRCS += FlexDCMotorDriver.cpp
 
 flexdcMotor_LIBS += motor
 flexdcMotor_LIBS += asyn

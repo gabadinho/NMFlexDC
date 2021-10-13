@@ -1,0 +1,9 @@
+# RELEASE - Location of external support modules
+
+# Use motor/module's generated release file when buidling inside motor
+-include $(TOP)/../../../RELEASE.$(EPICS_HOST_ARCH).local
+# Use motorNMFlexDC's release file when building inside motorNMFlexDC, but outside motor
+-include $(TOP)/../../configure/RELEASE.local
+# Use flexdcIOC's RELEASE.local when building outside motorNMFlexDC
+-include $(TOP)/configure/RELEASE.local
+

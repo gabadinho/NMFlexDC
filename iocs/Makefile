@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/configure/CONFIG
 
-DIRS += flexdcIOC
+DIRS += flexdcIOC gtestIOC
 
 include $(TOP)/configure/RULES_TOP
 

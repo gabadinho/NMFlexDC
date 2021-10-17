@@ -42,8 +42,7 @@ gtest_SRCS_vxWorks += -nil-
 gtest_LIBS += $(EPICS_BASE_IOC_LIBS)
 
 # Note: googletest was compiled by passing -DCMAKE_POSITION_INDEPENDENT_CODE=ON to cmake
-#       to prevent 'recompile with -fPIC' error when creating libluaiocsup.so
-#       and installed to /usr/local
+#       to prevent 'recompile with -fPIC' error, and installed to /usr/local
 USR_SYS_LIBS += gtest pthread
 
 #===========================

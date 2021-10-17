@@ -4,6 +4,6 @@
 -include $(TOP)/../../../RELEASE.$(EPICS_HOST_ARCH).local
 # Use motorNMFlexDC's release file when building inside motorNMFlexDC, but outside motor
 -include $(TOP)/../../configure/RELEASE.local
-# Use flexdcIOC's RELEASE.local when building outside motorNMFlexDC
+# Use gtestIOC's RELEASE.local when building outside motorNMFlexDC
 -include $(TOP)/configure/RELEASE.local
 

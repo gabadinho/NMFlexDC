@@ -13,3 +13,17 @@ Please refer to the provided example IOC, flexdcIOC, for specifics.
 
 The ```NMFlexDCCreateController``` command follows the usual API ```(portName, asynPortName, numAxes, movingPollingRate, idlePollingRate)```.
 
+### Extra records:
+- ```$(P)$(M)_HOMR_CMD```
+Which macro to use when HOMR field is _'put_ (disabled, reverse limit-switch, home index mark).
+- ```$(P)$(M)_HOMF_CMD```
+Which macro to use when HOMF field is _'put_ (disabled, forward limit-switch, home index mark).
+- ```$(P)$(M)_HOMS_CMD```
+Status of the homing macro (11th value of parameters array),
+- ```$(P)$(M)_RST_CMD```
+Kills running macros, turns off power to the motors, and resets the controller (note: despite this field being attached to each axis, all actions are controller-wide).
+
+### Limitations:
+- Calibration, PID loop filters, I/O, etc., are not implemented!
+- Homing feature relies on the macros provided by Nanomotion to be loaded and configured on the controller.
+

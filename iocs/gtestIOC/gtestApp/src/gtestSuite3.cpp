@@ -39,13 +39,13 @@ TEST(setMotionDoneMock, AlreadyOff) {
 
 TEST(setMotionDoneMock, ErrorTooLarge) {
     MockFlexDCAxis dummy_axis(&dummy_ctrl);
-    EXPECT_CALL(dummy_axis, getDoubleParam(testing::_, testing::_)).Times(2);;
+    EXPECT_CALL(dummy_axis, getDoubleParam(testing::_, testing::_)).Times(2);
     dummy_axis.setMotionDone(0, OK, true, 10);
 }
 
 TEST(setMotionDoneMock, ShouldStop) {
     MockFlexDCAxis dummy_axis(&dummy_ctrl);
-    EXPECT_CALL(dummy_axis, getDoubleParam(testing::_, testing::_)).Times(2);;
+    EXPECT_CALL(dummy_axis, getDoubleParam(testing::_, testing::_)).Times(2);
     EXPECT_CALL(dummy_axis, switchMotorPower(false));
     EXPECT_CALL(dummy_axis, setIntegerParam(testing::_, 1));
     dummy_axis.setMotionDone(0, OK, true, 0);

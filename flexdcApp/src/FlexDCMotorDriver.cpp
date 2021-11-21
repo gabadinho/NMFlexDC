@@ -10,6 +10,7 @@ April 2021
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdarg.h>
 
 #include "FlexDCMotorDriver.h"
 
@@ -20,6 +21,45 @@ April 2021
 
 #include <epicsExport.h>
 #include <epicsThread.h>
+
+
+
+const char* MOTION_END_REASON[] = {
+    "IN_MOTION",
+    "NORMAL",
+    "HARD_FLS",
+    "HARD_RLS",
+    "SOFT_HL",
+    "SOFT_LL",
+    "MOTOR_FAULT",
+    "USER_STOP",
+    "MOTOR_OFF",
+    "BAD_PARAM"
+};
+
+const char* MACRO_RESULT[] = {
+    "EXECUTING",
+    "OK",
+    "OTHER2",
+    "OTHER3",
+    "OTHER4",
+    "FAIL_NO_INDEX_FOUND",
+    "FAIL_TOO_MANY_FOUND",
+    "OTHER7",
+    "OTHER8",
+    "FAIL_GET_OFF_INPUT"
+};
+
+const char* HOMR_MACRO[] = {
+    "",
+    "%cQE,#HINRI%c",
+    "%cQE,#HINX_%c"
+};
+const char* HOMF_MACRO[] = {
+    "",
+    "%cQE,#HINFI%c",
+    "%cQE,#HINX_%c"
+};
 
 
 
@@ -56,22 +96,22 @@ FlexDCController::FlexDCController(const char *portName, const char *asynPortNam
     numAxes = 2; // Force two-axes regardless of what user says
 
     // Connect to FlexDC controller
-    asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, "%s:%s: Creating Nanomotion FlexDC controller %s to asyn %s with %d axes\n", driverName, functionName, portName, asynPortName, numAxes);
+    log(ASYN_TRACE_FLOW, "%s:%s: Creating Nanomotion FlexDC controller %s to asyn %s with %d axes\n", driverName, functionName, portName, asynPortName, numAxes);
     status = pasynOctetSyncIO->connect(asynPortName, 0, &pasynUserController_, NULL);
     if (status) {
-        asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "%s:%s: Cannot connect to Nanomotion FlexDC controller at asyn %s\n", driverName, functionName, asynPortName);
-    }
+        log(ASYN_TRACE_ERROR, "%s:%s: Cannot connect to Nanomotion FlexDC controller at asyn %s\n", driverName, functionName, asynPortName);
+    } else {
+        pasynOctetSyncIO->getInputEos(pasynUserController_, eos, 10, &eos_len);
+        if (!eos_len) {
+            log(ASYN_TRACE_FLOW, "%s:%s: Setting input acknowledgement of %s to '>'\n", driverName, functionName, portName);
+            pasynOctetSyncIO->setInputEos(pasynUserController_, ">", 1);
+        }
 
-    pasynOctetSyncIO->getInputEos(pasynUserController_, eos, 10, &eos_len);
-    if (!eos_len) {
-        asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, "%s:%s: Setting input acknowledgement of %s to '>'\n", driverName, functionName, portName);
-        pasynOctetSyncIO->setInputEos(pasynUserController_, ">", 1);
-    }
-
-    pasynOctetSyncIO->getOutputEos(pasynUserController_, eos, 10, &eos_len);
-    if (!eos_len) {
-        asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, "%s:%s: Setting output acknowledgement of %s to CR LF\n", driverName, functionName, portName);
-        pasynOctetSyncIO->setOutputEos(pasynUserController_, "\r\n", 2);
+        pasynOctetSyncIO->getOutputEos(pasynUserController_, eos, 10, &eos_len);
+        if (!eos_len) {
+            log(ASYN_TRACE_FLOW, "%s:%s: Setting output acknowledgement of %s to CR LF\n", driverName, functionName, portName);
+            pasynOctetSyncIO->setOutputEos(pasynUserController_, "\r\n", 2);
+        }
     }
 
     // Create the axis objects
@@ -116,7 +156,7 @@ asynStatus FlexDCController::writeInt32(asynUser *pasynUser, epicsInt32 value) {
             status = asynMotorController::writeInt32(pasynUser, value);
         }
     } else {
-        asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Unable to retrieve FlexDC %s axis from asynUser in %s\n", this->portName, functionName);
+        log(ASYN_TRACE_ERROR, "Unable to retrieve FlexDC %s axis from asynUser in %s\n", this->portName, functionName);
         status = asynError;
     }
 
@@ -142,7 +182,7 @@ void FlexDCController::report(FILE *fp, int level) {
         if (status == asynSuccess) {
             fprintf(fp, "  version = %s\n", this->inString_);
         } else {
-            asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Unable to retrieve FlexDC %s controller version\n", this->portName);
+            log(ASYN_TRACE_ERROR, "Unable to retrieve FlexDC %s controller version\n", this->portName);
         }
     }
 
@@ -168,6 +208,18 @@ FlexDCAxis* FlexDCController::getAxis(asynUser *pasynUser) {
   */
 FlexDCAxis* FlexDCController::getAxis(int axisNo) {
     return static_cast<FlexDCAxis*>(asynMotorController::getAxis(axisNo));
+}
+
+/** Provide a class method to be used instead of asynPrint().
+  * Beware: can be called from constructor!
+  */
+void FlexDCController::log(int reason, const char *format, ...) {
+    if (this->pasynUserSelf) {
+        va_list arglist;
+        va_start(arglist, format);
+        pasynTrace->vprint(this->pasynUserSelf, reason, format, arglist);
+        va_end(arglist);
+    }
 }
 
 
@@ -214,8 +266,8 @@ void FlexDCAxis::report(FILE *fp, int level) {
             speed = -1;
         }
 
-        pC_->getIntegerParam(this->axisNo_, pC_->driverHomeReverseMacro, &homr_type);
-        pC_->getIntegerParam(this->axisNo_, pC_->driverHomeForwardMacro, &homf_type);
+        getIntegerParam(pC_->driverHomeReverseMacro, &homr_type);
+        getIntegerParam(pC_->driverHomeForwardMacro, &homf_type);
 
         fprintf(fp,
             "  axis %d\n"
@@ -274,7 +326,7 @@ asynStatus FlexDCAxis::move(double position, int relative, double minVelocity, d
         shortWait();
     }
     if (status == asynSuccess) {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Moving FlexDC %s axis %d to %ld at velocity %d\n", pC_->portName, this->axisNo_, target, speed);
+        log(ASYN_TRACE_FLOW, "Moving FlexDC %s axis %d to %ld at velocity %d\n", pC_->portName, this->axisNo_, target, speed);
 
         setIntegerParam(pC_->motorStatusDone_, 0);
 
@@ -315,16 +367,16 @@ asynStatus FlexDCAxis::home(double minVelocity, double maxVelocity, double accel
 
     if (status == asynSuccess) {
         if (forwards) {
-            pC_->getIntegerParam(this->axisNo_, pC_->driverHomeForwardMacro, &hom_type);
+            getIntegerParam(pC_->driverHomeForwardMacro, &hom_type);
         } else {
-            pC_->getIntegerParam(this->axisNo_, pC_->driverHomeReverseMacro, &hom_type);
+            getIntegerParam(pC_->driverHomeReverseMacro, &hom_type);
         }
 
         if (hom_type > DISABLED) {
             if (forwards) {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Forward-homing FlexDC %s axis %d with type %d\n", pC_->portName, this->axisNo_, hom_type);
+                log(ASYN_TRACE_FLOW, "Forward-homing FlexDC %s axis %d with type %d\n", pC_->portName, this->axisNo_, hom_type);
             } else {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Reverse-homing FlexDC %s axis %d with type %d\n", pC_->portName, this->axisNo_, hom_type);
+                log(ASYN_TRACE_FLOW, "Reverse-homing FlexDC %s axis %d with type %d\n", pC_->portName, this->axisNo_, hom_type);
             }
 
             setIntegerParam(pC_->motorStatusDone_, 0);
@@ -340,9 +392,9 @@ asynStatus FlexDCAxis::home(double minVelocity, double maxVelocity, double accel
 
         } else {
             if (forwards) {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Forward-homing of FlexDC %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
+                log(ASYN_TRACE_ERROR, "Forward-homing of FlexDC %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
             } else {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Reverse-homing of FlexDC %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
+                log(ASYN_TRACE_ERROR, "Reverse-homing of FlexDC %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
             }
             status = asynError;
         }
@@ -382,7 +434,7 @@ asynStatus FlexDCAxis::setPosition(double position) {
     asynStatus status = asynError;
 
     if ((this->macroResult == EXECUTING) || (this->motionStatus != 0)) {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Due to ongoing motion of FlexDC %s axis %d, readback position will not be overriden!\n", pC_->portName, this->axisNo_);
+        log(ASYN_TRACE_ERROR, "Due to ongoing motion of FlexDC %s axis %d, readback position will not be overriden!\n", pC_->portName, this->axisNo_);
     } else {
         buildSetPositionCommand(pC_->outString_, this->axisNo_, position);
         status = pC_->writeController();
@@ -409,104 +461,75 @@ asynStatus FlexDCAxis::poll(bool *moving) {
 
     buildGenericGetCommand(pC_->outString_, AXIS_GETPOS_CMD, this->axisNo_);
     status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        this->positionReadback = atol(pC_->inString_);
+    if (updateAxisReadbackPosition(status, pC_->inString_, this->positionReadback, &final_status)) {
         setDoubleParam(pC_->motorEncoderPosition_, this->positionReadback);
         setDoubleParam(pC_->motorPosition_, this->positionReadback);
-    } else {
-        final_status = asynError;
     }
 
     buildGenericGetCommand(pC_->outString_, AXIS_ISPOWERED_CMD, this->axisNo_);
     status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        this->isMotorOn = atol(pC_->inString_);
-        valid_ispowered = true;
+    if ((valid_ispowered = updateAxisMotorPower(status, pC_->inString_, this->isMotorOn, &final_status))) {
         setIntegerParam(pC_->motorStatusPowerOn_, this->isMotorOn);
-    } else {
-        final_status = asynError;
     }
 
     buildGenericGetCommand(pC_->outString_, AXIS_MOTIONSTATUS_CMD, this->axisNo_);
     status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        this->motionStatus = atoi(pC_->inString_);
-        valid_motion_status = true;
-    } else {
-        final_status = asynError;
-    }
+    valid_motion_status = updateAxisMotionStatus(status, pC_->inString_, this->motionStatus, &final_status);
 
     buildGenericGetCommand(pC_->outString_, AXIS_MACRO_RESULT_CMD, this->axisNo_);
     status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        this->macroResult = static_cast<flexdcMacroResult>(atoi(pC_->inString_));
-        valid_macro_result = true;
+    if ((valid_macro_result = updateAxisMacroResult(status, pC_->inString_, this->macroResult, &final_status))) {
         setIntegerParam(pC_->driverHomeStatus, this->macroResult);
 
-        pC_->getIntegerParam(this->axisNo_, pC_->motorStatusHome_, &is_homing);
+        getIntegerParam(pC_->motorStatusHome_, &is_homing);
         if ((this->macroResult != EXECUTING) && (is_homing)) {
             pC_->setIntegerParam(pC_->motorStatusHome_, 0);
 
             if (this->macroResult == OK) {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "FlexDC %s axis %d is now homed\n", pC_->portName, this->axisNo_);
+                log(ASYN_TRACE_FLOW, "FlexDC %s axis %d is now homed\n", pC_->portName, this->axisNo_);
                 setIntegerParam(pC_->motorStatusHomed_, 1);
             } else {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "FlexDC %s axis %d failed to home with error code %d!\n", pC_->portName, this->axisNo_, this->macroResult);
+                log(ASYN_TRACE_FLOW, "FlexDC %s axis %d failed to home with error code %d!\n", pC_->portName, this->axisNo_, this->macroResult);
             }
         }
-    } else {
-        final_status = asynError;
     }
 
     buildGenericGetCommand(pC_->outString_, AXIS_MOTIONEND_CMD, this->axisNo_);
     status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        this->endMotionReason = static_cast<flexdcMotionEndReason>(atoi(pC_->inString_));
-
-        pC_->getIntegerParam(this->axisNo_, pC_->motorStatusLowLimit_, &at_limit);
+    if (updateAxisMotionEnd(status, pC_->inString_, this->endMotionReason, &final_status)) {
+        getIntegerParam(pC_->motorStatusLowLimit_, &at_limit);
         if ((this->endMotionReason == HARD_RLS) && (!at_limit)) {
-            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "FlexDC %s axis %d at low limit switch\n", pC_->portName, this->axisNo_);
+            log(ASYN_TRACE_FLOW, "FlexDC %s axis %d at low limit switch\n", pC_->portName, this->axisNo_);
             setIntegerParam(pC_->motorStatusLowLimit_, 1);
             switchMotorPower(false);
         } else if ((this->endMotionReason != HARD_RLS) && (this->endMotionReason != MOTOR_OFF) && (at_limit)) {
             setIntegerParam(pC_->motorStatusLowLimit_, 0);
         }
 
-        pC_->getIntegerParam(this->axisNo_, pC_->motorStatusHighLimit_, &at_limit);
+        getIntegerParam(pC_->motorStatusHighLimit_, &at_limit);
         if ((this->endMotionReason == HARD_FLS) && (!at_limit)) {
-            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "FlexDC %s axis %d at high limit switch\n", pC_->portName, this->axisNo_);
+            log(ASYN_TRACE_FLOW, "FlexDC %s axis %d at high limit switch\n", pC_->portName, this->axisNo_);
             setIntegerParam(pC_->motorStatusHighLimit_, 1);
             switchMotorPower(false);
         } else if ((this->endMotionReason != HARD_FLS) && (this->endMotionReason != MOTOR_OFF) && (at_limit)) {
             setIntegerParam(pC_->motorStatusHighLimit_, 0);
         }
-
-    } else {
-        final_status = asynError;
     }
 
     buildGenericGetCommand(pC_->outString_, AXIS_POSERR_CMD, this->axisNo_);
     status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        this->positionError = atol(pC_->inString_);
-
-        // Power off motor when not moving/homing and position-error is lower than retry-deadband
-        if ((valid_macro_result) && (valid_motion_status) && (valid_ispowered)) {
+    if (updateAxisPositionError(status, pC_->inString_, this->positionError, &final_status)) {
+        getIntegerParam(pC_->motorStatusDone_, &status_done);
+        if ((valid_macro_result) && (valid_motion_status) && (valid_ispowered) && (!status_done)) {
             setMotionDone(this->motionStatus, this->macroResult, this->isMotorOn, this->positionError);
         }
-    } else {
-        final_status = asynError;
     }
 
     buildGenericGetCommand(pC_->outString_, AXIS_MOTORFAULT_CMD, this->axisNo_);
     status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        this->motorFault = atoi(pC_->inString_);
-    } else {
-        final_status = asynError;
-    }
+    updateAxisMotorFault(status, pC_->inString_, this->motorFault, &final_status);
 
-    pC_->getIntegerParam(this->axisNo_, pC_->motorStatusDone_, &status_done);
+    getIntegerParam(pC_->motorStatusDone_, &status_done);
     *moving = !status_done;
 
     setStatusProblem(final_status);
@@ -521,7 +544,7 @@ asynStatus FlexDCAxis::poll(bool *moving) {
 void FlexDCAxis::setStatusProblem(asynStatus status) {
     int status_problem;
 
-    pC_->getIntegerParam(this->axisNo_, pC_->motorStatus_, &status_problem);
+    getIntegerParam(pC_->motorStatus_, &status_problem);
     if ((status != asynSuccess) && (!status_problem)) {
         setIntegerParam(pC_->motorStatusProblem_, 1);
     }
@@ -541,24 +564,21 @@ void FlexDCAxis::setStatusProblem(asynStatus status) {
   */
 asynStatus FlexDCAxis::setMotionDone(int motion_status, flexdcMacroResult macro_result, bool power_on, long pos_error) {
     asynStatus status = asynSuccess;
-    int status_done, allowed_error;
-    double rdbd, mres;
+    int allowed_error;
+    double rdbd=0.0, mres=1.0;
 
-    pC_->getIntegerParam(this->axisNo_, pC_->motorStatusDone_, &status_done);
-    if (!status_done) {
-        if ((macro_result != EXECUTING) && (motion_status == 0) && (power_on)) {
-            pC_->getDoubleParam(this->axisNo_, pC_->driverRetryDeadband, &rdbd);
-            pC_->getDoubleParam(this->axisNo_, pC_->driverMotorRecResolution, &mres);
-            allowed_error = (int)(rdbd/mres);
+    if ((macro_result != EXECUTING) && (motion_status == 0) && (power_on)) {
+        getDoubleParam(pC_->driverRetryDeadband, &rdbd);
+        getDoubleParam(pC_->driverMotorRecResolution, &mres);
+        allowed_error = (int)(rdbd/mres);
 
-            if (labs(pos_error) <= allowed_error) {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "FlexDC %s axis %d motion is within error margin, switching off motor\n", pC_->portName, this->axisNo_);
-                setIntegerParam(pC_->motorStatusDone_, 1);
-                status = switchMotorPower(false);
-            }
-        } else if ((macro_result != EXECUTING) && (motion_status == 0)) {
+        if (labs(pos_error) <= allowed_error) {
+            log(ASYN_TRACE_FLOW, "FlexDC %s axis %d motion is within error margin, switching off motor\n", pC_->portName, this->axisNo_);
             setIntegerParam(pC_->motorStatusDone_, 1);
+            status = switchMotorPower(false);
         }
+    } else if ((macro_result != EXECUTING) && (motion_status == 0)) {
+        setIntegerParam(pC_->motorStatusDone_, 1);
     }
 
     return status;
@@ -571,7 +591,7 @@ asynStatus FlexDCAxis::setMotionDone(int motion_status, flexdcMacroResult macro_
   * \return Result of writeController() call
   */
 asynStatus FlexDCAxis::switchMotorPower(bool on) {
-    asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Switching FlexDC %s axis %d power to %d\n", pC_->portName, this->axisNo_, on);
+    log(ASYN_TRACE_FLOW, "Switching FlexDC %s axis %d power to %d\n", pC_->portName, this->axisNo_, on);
     buildMotorPowerCommand(pC_->outString_, this->axisNo_, on);
     return pC_->writeController();
 }
@@ -581,7 +601,7 @@ asynStatus FlexDCAxis::switchMotorPower(bool on) {
   * \return Result of writeController() call
   */
 asynStatus FlexDCAxis::stopMotor() {
-    asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Stop motion on FlexDC %s axis %d\n", pC_->portName, this->axisNo_);
+    log(ASYN_TRACE_FLOW, "Stop motion on FlexDC %s axis %d\n", pC_->portName, this->axisNo_);
     buildStopCommand(pC_->outString_, this->axisNo_);
     return pC_->writeController();
 }
@@ -591,7 +611,7 @@ asynStatus FlexDCAxis::stopMotor() {
   * \return Result of writeController() call
   */
 asynStatus FlexDCAxis::haltHomingMacro() {
-    asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Halting FlexDC %s axis %d homing macro\n", pC_->portName, this->axisNo_);
+    log(ASYN_TRACE_FLOW, "Halting FlexDC %s axis %d homing macro\n", pC_->portName, this->axisNo_);
     buildHaltMacroCommand(pC_->outString_, this->axisNo_);
     return pC_->writeController();
 }
@@ -601,6 +621,109 @@ asynStatus FlexDCAxis::haltHomingMacro() {
   */
 void FlexDCAxis::shortWait() {
     epicsThreadSleep(0.1);
+}
+
+/** Shortcuts to asynMotorController functions.
+  *
+  */
+asynStatus FlexDCAxis::getIntegerParam(int index, epicsInt32 *value) {
+    return this->pC_->getIntegerParam(this->axisNo_, index, value);
+}
+
+asynStatus FlexDCAxis::getDoubleParam(int index, double *value) {
+    return this->pC_->getDoubleParam(this->axisNo_, index, value);
+}
+
+/** Provide a class method to be used instead of asynPrint().
+  * Beware: can be called from constructor!
+  */
+void FlexDCAxis::log(int reason, const char *format, ...) {
+    if (this->pC_) {
+        va_list arglist;
+        va_start(arglist, format);
+        pasynTrace->vprint(pC_->pasynUserSelf, reason, format, arglist);
+        va_end(arglist);
+    }
+}
+
+/** All the following methods parse a reply sent by the controller.
+  *
+  */
+bool FlexDCAxis::updateAxisReadbackPosition(asynStatus status, const char *reply, long& readback, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (issigneddigit(reply))) {
+        readback = atol(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool FlexDCAxis::updateAxisMotorPower(asynStatus status, const char *reply, bool& motor_power, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (strlen(reply)==1) && ((*reply>='0') && (*reply<='1'))) {
+        motor_power = atol(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool FlexDCAxis::updateAxisMotionStatus(asynStatus status, const char *reply, int& motion_stat, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (strlen(reply)) && (isdigit(*reply))) {
+        motion_stat = atoi(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool FlexDCAxis::updateAxisMacroResult(asynStatus status, const char *reply, flexdcMacroResult& macro_res, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (strlen(reply)==1) && ((*reply>='0') && (*reply<='9'))) {
+        macro_res = static_cast<flexdcMacroResult>(atoi(reply));
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool FlexDCAxis::updateAxisMotionEnd(asynStatus status, const char *reply, flexdcMotionEndReason& motion_end, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (strlen(reply)==1) && ((*reply>='0') && (*reply<='9'))) {
+        motion_end = static_cast<flexdcMotionEndReason>(atoi(reply));
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool FlexDCAxis::updateAxisPositionError(asynStatus status, const char *reply, long& pos_error, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (issigneddigit(reply))) {
+        pos_error = atol(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool FlexDCAxis::updateAxisMotorFault(asynStatus status, const char *reply, int& mot_fault, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (strlen(reply)) && (isdigit(*reply))) {
+        mot_fault = atoi(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
 }
 
 /** All the following methods generate a command string to be sent to the controller.

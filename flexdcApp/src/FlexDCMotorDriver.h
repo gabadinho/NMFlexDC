@@ -67,18 +67,6 @@ enum flexdcMotionEndReason {
     MOTOR_OFF,
     BAD_PARAM
 };
-const char* MOTION_END_REASON[] = {
-    "IN_MOTION",
-    "NORMAL",
-    "HARD_FLS",
-    "HARD_RLS",
-    "SOFT_HL",
-    "SOFT_LL",
-    "MOTOR_FAULT",
-    "USER_STOP",
-    "MOTOR_OFF",
-    "BAD_PARAM"
-};
 
 enum flexdcMacroResult {
     EXECUTING,
@@ -87,33 +75,11 @@ enum flexdcMacroResult {
     FAIL_TOO_MANY_FOUND,
     FAIL_GET_OFF_INPUT=9
 };
-const char* MACRO_RESULT[] = {
-    "EXECUTING",
-    "OK",
-    "OTHER2",
-    "OTHER3",
-    "OTHER4",
-    "FAIL_NO_INDEX_FOUND",
-    "FAIL_TOO_MANY_FOUND",
-    "OTHER7",
-    "OTHER8",
-    "FAIL_GET_OFF_INPUT"
-};
 
 enum flexdcHomeMacro {
     DISABLED,
     HOME_LS,
     HOME_IDX
-};
-const char* HOMR_MACRO[] = {
-    "",
-    "%cQE,#HINRI%c",
-    "%cQE,#HINX_%c"
-};
-const char* HOMF_MACRO[] = {
-    "",
-    "%cQE,#HINFI%c",
-    "%cQE,#HINX_%c"
 };
 
 
@@ -134,6 +100,14 @@ public:
     asynStatus poll(bool *moving);
 
     // Class-wide methods
+    static bool updateAxisReadbackPosition(asynStatus status, const char *reply, long& readback, asynStatus *asyn_error);
+    static bool updateAxisMotorPower(asynStatus status, const char *reply, bool& motor_power, asynStatus *asyn_error);
+    static bool updateAxisMotionStatus(asynStatus status, const char *reply, int& motion_stat, asynStatus *asyn_error);
+    static bool updateAxisMacroResult(asynStatus status, const char *reply, flexdcMacroResult& macro_res, asynStatus *asyn_error);
+    static bool updateAxisMotionEnd(asynStatus status, const char *reply, flexdcMotionEndReason& motion_end, asynStatus *asyn_error);
+    static bool updateAxisPositionError(asynStatus status, const char *reply, long& pos_error, asynStatus *asyn_error);
+    static bool updateAxisMotorFault(asynStatus status, const char *reply, int& mot_fault, asynStatus *asyn_error);
+
     static bool buildMoveCommand(char *buffer, int axis, double position, bool relative, double velocity);
     static bool buildSetPositionCommand(char *buffer, int axis, double position);
     static bool buildStopCommand(char *buffer, int axis);
@@ -142,20 +116,32 @@ public:
     static bool buildHomeMacroCommand(char *buffer, int axis, bool forwards, flexdcHomeMacro home_type);
     static bool buildGenericGetCommand(char *buffer, const char *command_format, int axis);
 
+    static bool issigneddigit(const char *buffer) {
+        size_t buf_len = strlen(buffer);
+        if (buf_len == 1) return isdigit(*buffer);
+        if (buf_len > 1) return isdigit(*buffer) || (*buffer=='-' && isdigit(*++buffer));
+        return false;
+    }
+
 protected:
     // Specific class methods
-    void setStatusProblem(asynStatus status);
+    virtual void setStatusProblem(asynStatus status);
 
-    asynStatus setMotionDone(int motion_status, flexdcMacroResult macro_result, bool power_on, long pos_error);
+    virtual asynStatus setMotionDone(int motion_status, flexdcMacroResult macro_result, bool power_on, long pos_error);
 
-    asynStatus switchMotorPower(bool on);
-    asynStatus stopMotor();
-    asynStatus haltHomingMacro();
-    void shortWait();
+    virtual asynStatus switchMotorPower(bool on);
+    virtual asynStatus stopMotor();
+    virtual asynStatus haltHomingMacro();
+    virtual void shortWait();
 
-private:
+    virtual asynStatus getIntegerParam(int index, epicsInt32 *value);
+    virtual asynStatus getDoubleParam(int index, double *value);
+
+    virtual void log(int reason, const char *format, ...);
+
     FlexDCController *pC_; // Pointer to the asynMotorController to which this axis belongs
 
+private:
     int motionStatus;
     int motorFault;
     flexdcMotionEndReason endMotionReason;
@@ -183,6 +169,8 @@ public:
     FlexDCAxis* getAxis(int axisNo);
 
 protected:
+    virtual void log(int reason, const char *format, ...);
+
     int driverMotorRecResolution;
     int driverRetryDeadband;
     int driverHomeReverseMacro;

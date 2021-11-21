@@ -29,7 +29,7 @@ gtest_LIBS += flexdcMotor
 # gtest_registerRecordDeviceDriver.cpp derives from gtest.dbd
 gtest_SRCS += gtest_registerRecordDeviceDriver.cpp
 
-gtest_SRCS += gtestRegistrar.cpp gtestSuite1.cpp
+gtest_SRCS += gtestRegistrar.cpp gtestSuite1.cpp gtestSuite2.cpp gtestSuite3.cpp
 
 # Build the main IOC entry point on workstation OSs.
 gtest_SRCS_DEFAULT += gtestMain.cpp
@@ -43,7 +43,7 @@ gtest_LIBS += $(EPICS_BASE_IOC_LIBS)
 
 # Note: googletest was compiled by passing -DCMAKE_POSITION_INDEPENDENT_CODE=ON to cmake
 #       to prevent 'recompile with -fPIC' error, and installed to /usr/local
-USR_SYS_LIBS += gtest pthread
+USR_SYS_LIBS += gtest gmock pthread
 
 #===========================
 
